@@ -44,12 +44,13 @@ import { useControledMihomoConfig } from '@renderer/hooks/use-controled-mihomo-c
 
 let cachedConnections: IMihomoConnectionDetail[] = []
 const MAX_QUEUE_SIZE = 100
+const CONNECTIONS_FILTER_KEY = 'connections-filter'
 
 const Connections: React.FC = () => {
   const { t } = useTranslation()
   const { controledMihomoConfig } = useControledMihomoConfig()
   const { 'find-process-mode': findProcessMode = 'always' } = controledMihomoConfig || {}
-  const [filter, setFilter] = useState('')
+  const [filter, setFilter] = useState(() => localStorage.getItem(CONNECTIONS_FILTER_KEY) || '')
   const { appConfig, patchAppConfig } = useAppConfig()
   const appConfigValues: Partial<IAppConfig> = appConfig ?? {}
   const {
@@ -93,6 +94,10 @@ const Connections: React.FC = () => {
     activeConnectionsRef.current = activeConnections
     allConnectionsRef.current = allConnections
   }, [activeConnections, allConnections])
+
+  useEffect(() => {
+    localStorage.setItem(CONNECTIONS_FILTER_KEY, filter)
+  }, [filter])
 
   useEffect(() => {
     setViewMode(connectionViewMode)
