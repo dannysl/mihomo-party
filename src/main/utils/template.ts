@@ -32,7 +32,7 @@ export const defaultConfig: IAppConfig = {
   networkLatencyTargets: [],
   networkInfoCardOrder: ['ip', 'topology', 'latency'],
   useNameserverPolicy: false,
-  controlDns: true,
+  controlDns: false,
   controlSniff: true,
   floatingWindowCompatMode: true,
   disableHardwareAcceleration: false,

@@ -14,7 +14,7 @@ const DNS: React.FC = () => {
   const { t } = useTranslation()
   const { controledMihomoConfig, patchControledMihomoConfig } = useControledMihomoConfig()
   const { appConfig, patchAppConfig } = useAppConfig()
-  const { nameserverPolicy, useNameserverPolicy, controlDns = true } = appConfig || {}
+  const { nameserverPolicy, useNameserverPolicy, controlDns = false } = appConfig || {}
   const { dns, hosts } = controledMihomoConfig || {}
   const {
     enable = true,

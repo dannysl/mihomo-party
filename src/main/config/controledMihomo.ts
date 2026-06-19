@@ -54,7 +54,7 @@ export async function getControledMihomoConfig(force = false): Promise<Partial<I
 export async function patchControledMihomoConfig(patch: Partial<IMihomoConfig>): Promise<void> {
   controledMihomoWriteQueue = controledMihomoWriteQueue.then(async () => {
     const appConfig = await getAppConfig()
-    const { controlDns = true, controlSniff = true, controlDnsBeforePause } = appConfig
+    const { controlDns = false, controlSniff = true, controlDnsBeforePause } = appConfig
 
     // 当模式从 direct 切换到 rule/global 时，恢复之前保存的 DNS 状态
     const currentMode = controledMihomoConfig?.mode

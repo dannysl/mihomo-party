@@ -110,7 +110,7 @@ export async function generateProfile(): Promise<string | undefined> {
   const { current } = await getProfileConfig(true)
   const {
     diffWorkDir = false,
-    controlDns = true,
+    controlDns = false,
     controlSniff = true,
     useNameserverPolicy
   } = await getAppConfig()
