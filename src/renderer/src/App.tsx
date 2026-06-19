@@ -38,6 +38,7 @@ import { useTrafficLogger } from '@renderer/hooks/use-traffic-logger'
 import { createTourDriver, getDriver, startTourIfNeeded } from '@renderer/utils/tour'
 import 'driver.js/dist/driver.css'
 import { useTranslation } from 'react-i18next'
+import { DEFAULT_ENABLE_TRAFFIC_LOGGER, DEFAULT_SIDER_ORDER } from '../../shared/appConfig'
 import MihomoIcon from './components/base/mihomo-icon'
 import { SIDER_CARD_ROUTES, getSiderCardByPath, mergeSiderOrder } from './utils/sider'
 
@@ -50,28 +51,12 @@ const App: React.FC = () => {
   const { appConfig, patchAppConfig } = useAppConfig()
   const hasAppConfig = Boolean(appConfig)
   const {
-    enableTrafficLogger = true,
+    enableTrafficLogger = DEFAULT_ENABLE_TRAFFIC_LOGGER,
     appTheme = 'system',
     customTheme,
     useWindowFrame = false,
     siderWidth = 250,
-    siderOrder = [
-      'sysproxy',
-      'tun',
-      'profile',
-      'proxy',
-      'rule',
-      'resource',
-      'override',
-      'connection',
-      'mihomo',
-      'dns',
-      'sniff',
-      'log',
-      'substore',
-      'network',
-      'usage'
-    ],
+    siderOrder = DEFAULT_SIDER_ORDER,
     lastSelectedSiderCard = 'proxy'
   } = appConfig || {}
   useTrafficLogger(enableTrafficLogger)

@@ -1,20 +1,6 @@
-export const SIDER_CARD_KEYS: SiderCardKey[] = [
-  'sysproxy',
-  'tun',
-  'profile',
-  'proxy',
-  'rule',
-  'resource',
-  'override',
-  'connection',
-  'mihomo',
-  'dns',
-  'sniff',
-  'log',
-  'substore',
-  'network',
-  'usage'
-]
+import { DEFAULT_SIDER_ORDER } from '../../../shared/appConfig'
+
+export const SIDER_CARD_KEYS: SiderCardKey[] = DEFAULT_SIDER_ORDER
 
 export const SIDER_CARD_ROUTES: Record<SiderCardKey, string> = {
   sysproxy: '/sysproxy',

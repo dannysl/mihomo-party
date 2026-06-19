@@ -35,6 +35,7 @@ import SubStoreIcon from '@renderer/components/base/substore-icon'
 import useSWR from 'swr'
 import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
+import { DEFAULT_USE_SUB_STORE } from '../../../shared/appConfig'
 
 const Profiles: React.FC = () => {
   const { t } = useTranslation()
@@ -48,7 +49,11 @@ const Profiles: React.FC = () => {
     mutateProfileConfig
   } = useProfileConfig()
   const { appConfig } = useAppConfig()
-  const { useSubStore = true, useCustomSubStore = false, customSubStoreUrl = '' } = appConfig || {}
+  const {
+    useSubStore = DEFAULT_USE_SUB_STORE,
+    useCustomSubStore = false,
+    customSubStoreUrl = ''
+  } = appConfig || {}
   const { current, items = [] } = profileConfig || {}
   const navigate = useNavigate()
   const [sortedItems, setSortedItems] = useState(items)

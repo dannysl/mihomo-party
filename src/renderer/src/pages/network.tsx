@@ -25,6 +25,7 @@ import { IoMdGlobe, IoMdPulse } from 'react-icons/io'
 import { useTranslation } from 'react-i18next'
 import { fetchIPInfo, measureLatency } from '@renderer/utils/ipc'
 import { useAppConfig } from '@renderer/hooks/use-app-config'
+import { DEFAULT_NETWORK_INFO_CARD_ORDER } from '../../../shared/appConfig'
 
 type IPProvider = 'ip.sb' | 'ipwho.is' | 'ipapi.is'
 
@@ -128,8 +129,6 @@ const DEFAULT_LATENCY_TARGETS: LatencyTarget[] = [
   { name: 'Cloudflare', url: 'https://www.cloudflare.com/cdn-cgi/trace' },
   { name: 'GitHub', url: 'https://github.com/' }
 ]
-
-const DEFAULT_NETWORK_INFO_CARD_ORDER: NetworkInfoCardKey[] = ['ip', 'topology', 'latency']
 
 function mergeNetworkInfoCardOrder(saved: string[] = []): NetworkInfoCardKey[] {
   const valid = saved.filter((key): key is NetworkInfoCardKey =>

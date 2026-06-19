@@ -24,6 +24,7 @@ import { parse, stringify } from '../utils/yaml'
 import { deepMerge } from '../utils/merge'
 import { createLogger } from '../utils/logger'
 import { decryptAgeContent } from '../utils/age'
+import { DEFAULT_CONTROL_DNS, DEFAULT_CONTROL_SNIFF } from '../../shared/appConfig'
 
 const factoryLogger = createLogger('Factory')
 const SMART_OVERRIDE_ID = 'smart-core-override'
@@ -110,8 +111,8 @@ export async function generateProfile(): Promise<string | undefined> {
   const { current } = await getProfileConfig(true)
   const {
     diffWorkDir = false,
-    controlDns = false,
-    controlSniff = true,
+    controlDns = DEFAULT_CONTROL_DNS,
+    controlSniff = DEFAULT_CONTROL_SNIFF,
     useNameserverPolicy
   } = await getAppConfig()
   const currentProfileItem = await getProfileItem(current)

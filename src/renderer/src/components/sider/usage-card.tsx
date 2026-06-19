@@ -10,6 +10,7 @@ import { MdOutlineDataUsage } from 'react-icons/md'
 import { useTranslation } from 'react-i18next'
 import useSWR from 'swr'
 import dayjs from '@renderer/utils/dayjs'
+import { DEFAULT_ENABLE_TRAFFIC_LOGGER } from '../../../../shared/appConfig'
 
 interface Props {
   iconOnly?: boolean
@@ -22,7 +23,7 @@ const UsageCard: React.FC<Props> = (props) => {
   const {
     usageCardStatus = 'col-span-1',
     disableAnimations = false,
-    enableTrafficLogger = true
+    enableTrafficLogger = DEFAULT_ENABLE_TRAFFIC_LOGGER
   } = appConfig || {}
   const location = useLocation()
   const navigate = useNavigate()

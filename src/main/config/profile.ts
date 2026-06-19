@@ -11,6 +11,7 @@ import axios, { AxiosResponse } from 'axios'
 import { parse, stringify } from '../utils/yaml'
 import { defaultProfile } from '../utils/template'
 import { decryptAgeContent } from '../utils/age'
+import { DEFAULT_MIHOMO_PORTS } from '../../shared/appConfig'
 import { subStorePort } from '../resolve/server'
 import { mihomoCloseAllConnections, mihomoHotReloadConfig } from '../core/mihomoApi'
 import { restartCore } from '../core/manager'
@@ -453,7 +454,8 @@ export async function createProfile(item: Partial<IProfileItem>): Promise<IProfi
 
   const promise = (async (): Promise<IProfileItem> => {
     const { userAgent, subscriptionTimeout = 30000 } = await getAppConfig()
-    const { 'mixed-port': mixedPort = 7890 } = await getControledMihomoConfig()
+    const { 'mixed-port': mixedPort = DEFAULT_MIHOMO_PORTS.mixed } =
+      await getControledMihomoConfig()
     const userItemTimeoutMs =
       typeof newItem.updateTimeout === 'number' && newItem.updateTimeout > 0
         ? newItem.updateTimeout * 1000

@@ -2,6 +2,7 @@ import { writeFile } from 'fs/promises'
 import { dialog } from 'electron'
 import * as chromeRequest from '../utils/chromeRequest'
 import { getAppConfig, getControledMihomoConfig } from '../config'
+import { DEFAULT_MIHOMO_PORTS } from '../../shared/appConfig'
 import { getRuntimeConfigStr } from '../core/factory'
 import { encryptAgeContent, generateAgeKeyPair } from '../utils/age'
 
@@ -17,7 +18,7 @@ interface GistAgeKeyPair {
 }
 
 async function listGists(token: string): Promise<GistInfo[]> {
-  const { 'mixed-port': port = 7890 } = await getControledMihomoConfig()
+  const { 'mixed-port': port = DEFAULT_MIHOMO_PORTS.mixed } = await getControledMihomoConfig()
   const res = await chromeRequest.get('https://api.github.com/gists', {
     headers: {
       Accept: 'application/vnd.github+json',
@@ -35,7 +36,7 @@ async function listGists(token: string): Promise<GistInfo[]> {
 }
 
 async function createGist(token: string, content: string): Promise<void> {
-  const { 'mixed-port': port = 7890 } = await getControledMihomoConfig()
+  const { 'mixed-port': port = DEFAULT_MIHOMO_PORTS.mixed } = await getControledMihomoConfig()
   await chromeRequest.post(
     'https://api.github.com/gists',
     {
@@ -59,7 +60,7 @@ async function createGist(token: string, content: string): Promise<void> {
 }
 
 async function updateGist(token: string, id: string, content: string): Promise<void> {
-  const { 'mixed-port': port = 7890 } = await getControledMihomoConfig()
+  const { 'mixed-port': port = DEFAULT_MIHOMO_PORTS.mixed } = await getControledMihomoConfig()
   await chromeRequest.patch(
     `https://api.github.com/gists/${id}`,
     {
