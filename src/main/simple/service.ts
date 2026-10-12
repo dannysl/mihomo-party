@@ -30,6 +30,12 @@ import { compileSimpleConfig, type SimpleSharedConfig } from './compiler'
 import { patchSimpleDraft } from './patch'
 import { replaceSimpleSource, resolveSimpleDraft } from './subscriptions'
 import {
+  addSimpleNodes,
+  readSimpleNodes,
+  removeSimpleNode as removeSimpleNodeFromDraft,
+  updateSimpleNode
+} from './nodes'
+import {
   addSimpleGroup,
   readSimpleGroups,
   reorderSimpleGroups,
@@ -479,12 +485,13 @@ export async function getSimpleProxyGroup(name?: string): Promise<SimpleProxyGro
   }
 }
 
-async function assertSimpleGroupNameAvailable(
+async function assertSimpleNameAvailable(
   draft: SimpleDraft,
+  label: string,
   value: SimpleObject,
   previousName?: string
 ): Promise<void> {
-  if (typeof value.name !== 'string' || !value.name.trim()) throw new Error('代理组名称不能为空')
+  if (typeof value.name !== 'string' || !value.name.trim()) throw new Error(`${label}名称不能为空`)
   const name = value.name.trim()
   if (SIMPLE_BUILTIN_OUTBOUNDS.includes(name) || name === 'GLOBAL') {
     throw new Error(`不能使用内置出站或 GLOBAL 名称: ${name}`)
@@ -493,7 +500,9 @@ async function assertSimpleGroupNameAvailable(
   const resolved = await resolveSimpleDraft(draft)
   const { references } = compileSimpleConfig(resolved)
   if (references.outbounds.includes(name))
-    throw new Error(`代理组名称与已有节点或代理组冲突: ${name}`)
+    throw new Error(`${label}名称与已有节点或代理组冲突: ${name}`)
+  if (references.proxyProviders.includes(name))
+    throw new Error(`${label}名称与已有代理集合冲突: ${name}`)
 }
 
 export async function saveSimpleProxyGroup(
@@ -504,7 +513,7 @@ export async function saveSimpleProxyGroup(
   await simpleWriteQueue.run(async () => {
     if (!isRecord(value) || !isRecord(expected)) throw new Error('代理组参数必须是对象')
     const state = await getSimpleState()
-    await assertSimpleGroupNameAvailable(state.draft, value, name)
+    await assertSimpleNameAvailable(state.draft, '代理组', value, name)
     const draft = updateSimpleGroup(state.draft, name, value, expected)
     const published = updateSimpleGroup(state.published, name, value)
     const result = await commitSimpleState(state, {
@@ -521,7 +530,7 @@ export async function createSimpleProxyGroup(value: SimpleObject): Promise<void>
   await simpleWriteQueue.run(async () => {
     if (!isRecord(value)) throw new Error('代理组参数必须是对象')
     const state = await getSimpleState()
-    await assertSimpleGroupNameAvailable(state.draft, value)
+    await assertSimpleNameAvailable(state.draft, '代理组', value)
     const result = await commitSimpleState(state, {
       ...state,
       revision: state.revision + 1,
@@ -559,6 +568,69 @@ export async function reorderSimpleProxyGroups(names: string[]): Promise<void> {
       revision: state.revision + 1,
       draft,
       published
+    })
+    if (result.errors.length) throw new Error(result.errors.join('\n'))
+  })
+}
+
+export async function getSimpleNode(name?: string): Promise<SimpleObject> {
+  const state = await getSimpleState()
+  const node =
+    name === undefined
+      ? { name: '', type: 'ss' }
+      : readSimpleNodes(state.draft).find((item) => item.name === name)
+  if (!node) throw new Error(`找不到节点：${name}`)
+  return node
+}
+
+export async function createSimpleNodes(values: SimpleObject[]): Promise<void> {
+  await simpleWriteQueue.run(async () => {
+    if (!Array.isArray(values) || !values.length) throw new Error('节点参数不能为空')
+    const state = await getSimpleState()
+    for (const value of values) {
+      if (!isRecord(value)) throw new Error('节点参数必须是对象')
+      await assertSimpleNameAvailable(state.draft, '节点', value)
+    }
+    const result = await commitSimpleState(state, {
+      ...state,
+      revision: state.revision + 1,
+      draft: addSimpleNodes(state.draft, values),
+      published: addSimpleNodes(state.published, values)
+    })
+    if (result.errors.length) throw new Error(result.errors.join('\n'))
+  })
+}
+
+export async function saveSimpleNode(
+  name: string,
+  value: SimpleObject,
+  expected: SimpleObject
+): Promise<void> {
+  await simpleWriteQueue.run(async () => {
+    if (typeof name !== 'string' || !isRecord(value) || !isRecord(expected)) {
+      throw new Error('节点参数必须是对象')
+    }
+    const state = await getSimpleState()
+    await assertSimpleNameAvailable(state.draft, '节点', value, name)
+    const result = await commitSimpleState(state, {
+      ...state,
+      revision: state.revision + 1,
+      draft: updateSimpleNode(state.draft, name, value, expected),
+      published: updateSimpleNode(state.published, name, value)
+    })
+    if (result.errors.length) throw new Error(result.errors.join('\n'))
+  })
+}
+
+export async function removeSimpleNode(name: string, expected: SimpleObject): Promise<void> {
+  await simpleWriteQueue.run(async () => {
+    if (typeof name !== 'string' || !isRecord(expected)) throw new Error('节点参数无效')
+    const state = await getSimpleState()
+    const result = await commitSimpleState(state, {
+      ...state,
+      revision: state.revision + 1,
+      draft: removeSimpleNodeFromDraft(state.draft, name, expected),
+      published: removeSimpleNodeFromDraft(state.published, name)
     })
     if (result.errors.length) throw new Error(result.errors.join('\n'))
   })
