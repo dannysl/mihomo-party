@@ -103,6 +103,7 @@ const NodeFieldEditor: React.FC<Props> = ({ field, value, disabled, onChange }) 
     return (
       <Switch
         size="sm"
+        aria-label={field.label}
         isSelected={value === true}
         isDisabled={disabled}
         onValueChange={onChange}
@@ -118,6 +119,7 @@ const NodeFieldEditor: React.FC<Props> = ({ field, value, disabled, onChange }) 
     return (
       <Select
         size="sm"
+        aria-label={field.label}
         className="w-48"
         disallowEmptySelection
         selectedKeys={[current]}
@@ -138,6 +140,7 @@ const NodeFieldEditor: React.FC<Props> = ({ field, value, disabled, onChange }) 
     return (
       <Input
         size="sm"
+        aria-label={field.label}
         className="w-72"
         placeholder="逗号分隔"
         value={items.join(', ')}
@@ -157,6 +160,7 @@ const NodeFieldEditor: React.FC<Props> = ({ field, value, disabled, onChange }) 
     return (
       <Input
         size="sm"
+        aria-label={field.label}
         type="number"
         className="w-32"
         placeholder={field.default === undefined ? undefined : String(field.default)}
@@ -170,6 +174,7 @@ const NodeFieldEditor: React.FC<Props> = ({ field, value, disabled, onChange }) 
   return (
     <Input
       size="sm"
+      aria-label={field.label}
       className="w-72"
       type={secret && !revealed ? 'password' : 'text'}
       placeholder={field.default === undefined ? undefined : String(field.default)}

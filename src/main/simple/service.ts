@@ -28,6 +28,7 @@ import {
 } from './store'
 import { compileSimpleConfig, type SimpleSharedConfig } from './compiler'
 import { patchSimpleDraft } from './patch'
+import { normalizeSimpleProviderOptions } from './providers'
 import { replaceSimpleSource, resolveSimpleDraft } from './subscriptions'
 import {
   addSimpleNodes,
@@ -676,6 +677,10 @@ export async function configureSimpleSubscription(
       name,
       mode,
       prefix: options?.prefix ?? previous?.prefix ?? `[${name}] `,
+      providerOptions:
+        options?.providerOptions !== undefined
+          ? normalizeSimpleProviderOptions(options.providerOptions)
+          : previous?.providerOptions,
       interval: previous?.interval ?? 3600,
       proxies: []
     }

@@ -15,17 +15,18 @@ import { listOptionalSimpleNodeFields } from '../../../../shared/simple-node'
 /* eslint-disable react/prop-types */
 
 interface Props {
-  type: string
+  type?: string
+  fields?: readonly SimpleNodeFieldEntry[]
   hidden: Set<string>
   onPick: (path: string) => void
   onClose: () => void
 }
 
-const SimpleNodeFieldPicker: React.FC<Props> = ({ type, hidden, onPick, onClose }) => {
+const SimpleNodeFieldPicker: React.FC<Props> = ({ type, fields, hidden, onPick, onClose }) => {
   const [search, setSearch] = useState('')
   const entries = useMemo<SimpleNodeFieldEntry[]>(() => {
     const keyword = search.trim().toLowerCase()
-    return listOptionalSimpleNodeFields(type).filter((entry) => {
+    return (fields ?? listOptionalSimpleNodeFields(type || '')).filter((entry) => {
       if (hidden.has(entry.path)) return false
       if (!keyword) return true
       return (
@@ -33,7 +34,7 @@ const SimpleNodeFieldPicker: React.FC<Props> = ({ type, hidden, onPick, onClose 
         entry.labels.join(' ').toLowerCase().includes(keyword)
       )
     })
-  }, [type, hidden, search])
+  }, [type, fields, hidden, search])
   return (
     <Modal
       isOpen
