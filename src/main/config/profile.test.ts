@@ -5,6 +5,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { addProfileUpdater } from '../core/profileUpdater'
 import { getOverrideConfig, updateOverrideConfig } from './override'
 import {
+  addProfileItem,
   createProfile,
   getProfileConfig,
   getProfileItem,
@@ -205,6 +206,57 @@ describe('remote profile candidate validation', () => {
     expect(readFileSync(join(testDir, 'profiles', 'remote.yaml'), 'utf8')).toBe(newProfile)
     expect(mocks.hotReload).toHaveBeenCalledOnce()
   })
+})
+
+describe('custom profile homepage', () => {
+  const getRemoteProfile = async (): Promise<IProfileItem> => {
+    const item = await getProfileItem('remote')
+    if (!item) throw new Error('Missing remote profile')
+    return item
+  }
+
+  it('preserves a custom homepage across subscription updates and restores the supplied homepage when cleared', async () => {
+    const item = {
+      ...(await getRemoteProfile()),
+      url: 'https://example.test/subscription',
+      customHome: '  https://custom.example.test  '
+    }
+    await updateProfileItem(item)
+    for (const home of ['https://provider.example.test', undefined]) {
+      mocks.axiosGet.mockResolvedValueOnce({
+        status: 200,
+        data: newProfile,
+        headers: { 'content-type': 'text/yaml', 'profile-web-page-url': home }
+      })
+      await addProfileItem(await getRemoteProfile())
+      expect(await getProfileItem('remote')).toMatchObject({
+        customHome: 'https://custom.example.test'
+      })
+    }
+
+    mocks.axiosGet.mockResolvedValueOnce({
+      status: 200,
+      data: newProfile,
+      headers: { 'content-type': 'text/yaml', 'profile-web-page-url': 'https://new.example.test' }
+    })
+    await updateProfileItem({ ...(await getRemoteProfile()), customHome: '' })
+    await addProfileItem(await getRemoteProfile())
+    expect((await getProfileConfig(true)).items[0]).toMatchObject({
+      home: 'https://new.example.test'
+    })
+    expect((await getRemoteProfile()).customHome).toBeUndefined()
+  })
+
+  it.each(['invalid', 'javascript:alert(1)', 'file:///tmp/example'])(
+    'rejects unsupported homepage %s without changing the saved profile',
+    async (customHome) => {
+      const original = await getRemoteProfile()
+      await expect(updateProfileItem({ ...original, customHome })).rejects.toThrow()
+      await expect(createProfile({ ...original, customHome })).rejects.toThrow()
+      expect(await getProfileItem('remote')).toEqual(original)
+      expect(mocks.axiosGet).not.toHaveBeenCalled()
+    }
+  )
 })
 
 describe('profile deletion (R2-ISS-034 / R2-ISS-067)', () => {

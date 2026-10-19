@@ -129,7 +129,10 @@ const EditInfoModal: React.FC<Props> = (props) => {
       active = false
     }
   }, [simpleMode])
+  const customHome = values.customHome?.trim() || ''
+  const validHome = !customHome || (/^https?:\/\//i.test(customHome) && URL.canParse(customHome))
   const canSave =
+    validHome &&
     (!simpleMode || isImportMode || optionsLoaded) &&
     (!isImportMode ||
       (values.type === 'remote' ? Boolean(values.url?.trim()) : values.file != null))
@@ -230,6 +233,19 @@ const EditInfoModal: React.FC<Props> = (props) => {
           onValueChange={(v) => {
             setValues({ ...values, name: v })
           }}
+        />
+      </SettingItem>
+      <SettingItem title={t('profiles.editInfo.customHome')}>
+        <Input
+          size="sm"
+          type="url"
+          aria-label={t('profiles.editInfo.customHome')}
+          className={cn(inputWidth)}
+          value={values.customHome || ''}
+          isInvalid={!validHome}
+          errorMessage={t('profiles.editInfo.invalidHome')}
+          placeholder={values.home || t('profiles.editInfo.homePlaceholder')}
+          onValueChange={(customHome) => setValues({ ...values, customHome })}
         />
       </SettingItem>
       {simpleMode && (

@@ -605,6 +605,7 @@ interface IProfileItem {
   file?: string // local
   interval?: number | string
   home?: string
+  customHome?: string
   updated?: number
   override?: string[]
   useProxy?: boolean
