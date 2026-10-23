@@ -386,6 +386,7 @@ interface IAppConfig {
   networkIPProvider?: 'ip.sb' | 'ipwho.is' | 'ipapi.is'
   networkInfoCardOrder?: NetworkInfoCardKey[]
   subscriptionTimeout?: number
+  yamlMaxAliasCount?: number
   encryptedPassword?: number[]
   controlDns?: boolean
   disableDnsOverrideGuard?: boolean

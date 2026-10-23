@@ -378,6 +378,7 @@ interface FetchOptions {
   authToken?: string
   timeout: number
   substore: boolean
+  maxAliasCount?: number
 }
 
 interface FetchResult {
@@ -432,7 +433,8 @@ function parsedProfileSummary(parsed: Record<string, unknown>): string {
 }
 
 async function fetchAndValidateSubscription(options: FetchOptions): Promise<FetchResult> {
-  const { url, useProxy, mixedPort, userAgent, authToken, timeout, substore } = options
+  const { url, useProxy, mixedPort, userAgent, authToken, timeout, substore, maxAliasCount } =
+    options
   const redactedUrl = redactSubscriptionUrl(url)
   const fetchMode = substore ? 'substore' : useProxy ? 'proxy' : 'direct'
 
@@ -502,7 +504,7 @@ async function fetchAndValidateSubscription(options: FetchOptions): Promise<Fetc
   }
 
   const decryptedData = await decryptAgeContent(data, options.ageSecretKey, 'subscription')
-  const parsed = parse(decryptedData) as Record<string, unknown> | null
+  const parsed = parse(decryptedData, { maxAliasCount }) as Record<string, unknown> | null
   if (typeof parsed !== 'object' || parsed === null || Array.isArray(parsed)) {
     await profileLogger.warn(
       `Remote profile parse failed url=${redactedUrl} mode=${fetchMode} parsedType=${typeof parsed}`
@@ -571,7 +573,7 @@ export async function createProfile(item: Partial<IProfileItem>): Promise<IProfi
   }
 
   const promise = (async (): Promise<IProfileItem> => {
-    const { userAgent, subscriptionTimeout = 30000 } = await getAppConfig()
+    const { userAgent, subscriptionTimeout = 30000, yamlMaxAliasCount } = await getAppConfig()
     const { 'mixed-port': mixedPort = DEFAULT_MIHOMO_PORTS.mixed } =
       await getControledMihomoConfig()
     const userItemTimeoutMs =
@@ -585,7 +587,8 @@ export async function createProfile(item: Partial<IProfileItem>): Promise<IProfi
       userAgent: item.userAgent || userAgent || `mihomo.party/v${app.getVersion()} (clash.meta)`,
       ageSecretKey: newItem.ageSecretKey,
       authToken: item.authToken,
-      substore: newItem.substore || false
+      substore: newItem.substore || false,
+      maxAliasCount: yamlMaxAliasCount
     }
 
     const fetchSub = (useProxy: boolean, timeout: number): Promise<FetchResult> =>
@@ -787,7 +790,8 @@ export async function parseProfileContent(
   }
 
   try {
-    let result = parse(profile)
+    const { yamlMaxAliasCount } = await getAppConfig()
+    let result = parse(profile, { maxAliasCount: yamlMaxAliasCount })
     if (typeof result !== 'object') result = {}
     return result as IMihomoConfig
   } catch (e) {

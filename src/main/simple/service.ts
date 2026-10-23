@@ -2,6 +2,7 @@ import path from 'path'
 import axios from 'axios'
 import { app, dialog } from 'electron'
 import { parse, stringify } from '../utils/yaml'
+import { getAppConfig } from '../config/app'
 import { atomicWriteFile } from '../utils/safeFile'
 import { deepMerge } from '../utils/merge'
 import {
@@ -198,7 +199,8 @@ function extractProxies(value: unknown): Record<string, unknown>[] {
 async function fetchSubscriptionProxies(url: string): Promise<Record<string, unknown>[]> {
   if (!/^https?:$/i.test(new URL(url).protocol)) throw new Error('订阅地址必须使用 http(s)')
   const response = await axios.get<string>(url, { responseType: 'text', timeout: 30000 })
-  const proxies = extractProxies(parse(response.data))
+  const { yamlMaxAliasCount } = await getAppConfig()
+  const proxies = extractProxies(parse(response.data, { maxAliasCount: yamlMaxAliasCount }))
   if (proxies.length === 0) throw new Error('订阅中没有找到 proxies 节点')
   return proxies
 }
@@ -733,7 +735,10 @@ export async function importSimpleSubscription(input: {
         content = response.data
       }
     }
-    const proxies = content ? extractProxies(parse(content)) : []
+    const { yamlMaxAliasCount } = await getAppConfig()
+    const proxies = content
+      ? extractProxies(parse(content, { maxAliasCount: yamlMaxAliasCount }))
+      : []
     if (input.mode !== 'http' && proxies.length === 0)
       throw new Error('订阅中没有找到 proxies 节点；完整订阅请使用 HTTP Provider')
     const source: SimpleSource = {
