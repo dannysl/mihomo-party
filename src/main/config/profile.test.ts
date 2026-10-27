@@ -7,6 +7,7 @@ import { getOverrideConfig, updateOverrideConfig } from './override'
 import {
   addProfileItem,
   createProfile,
+  getProfileImportInfo,
   getProfileConfig,
   getProfileItem,
   removeProfileItem,
@@ -25,6 +26,7 @@ async function requireProfileItem(id: string) {
 }
 
 const mocks = vi.hoisted(() => ({
+  axiosHead: vi.fn(),
   axiosGet: vi.fn(),
   checkProfileConfig: vi.fn(),
   getPluginItem: vi.fn(),
@@ -75,7 +77,7 @@ vi.mock('../core/factory', async () => {
   }
 })
 vi.mock('i18next', () => ({ default: { t: (key: string) => key } }))
-vi.mock('axios', () => ({ default: { get: mocks.axiosGet } }))
+vi.mock('axios', () => ({ default: { get: mocks.axiosGet, head: mocks.axiosHead } }))
 vi.mock('../utils/age', () => ({
   decryptAgeContent: (content: string) => Promise.resolve(content)
 }))
@@ -165,6 +167,7 @@ beforeEach(async () => {
     data: newProfile,
     headers: { 'content-type': 'text/yaml' }
   })
+  mocks.axiosHead.mockResolvedValue({ status: 200, headers: {} })
   mocks.generateProfile.mockResolvedValue('remote')
   mocks.checkProfileConfig.mockResolvedValue(undefined)
   mocks.hotReload.mockResolvedValue(undefined)
@@ -302,6 +305,57 @@ describe('custom profile homepage', () => {
       expect(mocks.axiosGet).not.toHaveBeenCalled()
     }
   )
+})
+
+describe('remote profile import metadata', () => {
+  it('reads metadata from HEAD before importing', async () => {
+    mocks.axiosHead.mockResolvedValueOnce({
+      status: 200,
+      headers: {
+        'content-disposition': 'attachment; filename="my-profile.yaml"',
+        'profile-web-page-url': 'https://example.test/home',
+        'profile-update-interval': '12',
+        'subscription-userinfo': 'upload=1; download=2; total=3; expire=4'
+      }
+    })
+
+    await expect(
+      getProfileImportInfo({
+        url: 'https://example.test/sub',
+        useProxy: false,
+        substore: false,
+        allowFixedInterval: false
+      })
+    ).resolves.toMatchObject({
+      name: 'my-profile.yaml',
+      home: 'https://example.test/home',
+      interval: 720,
+      extra: { upload: 1, download: 2, total: 3, expire: 4 }
+    })
+    expect(mocks.axiosHead).toHaveBeenCalledOnce()
+    expect(mocks.axiosGet).not.toHaveBeenCalled()
+  })
+
+  it('uses response headers and URL name when HEAD has no metadata', async () => {
+    mocks.axiosHead.mockResolvedValueOnce({ status: 200, headers: {} })
+    mocks.axiosGet.mockResolvedValueOnce({
+      status: 200,
+      data: '',
+      headers: { 'profile-web-page-url': 'https://example.test/home' }
+    })
+
+    await expect(
+      getProfileImportInfo({
+        url: 'https://example.test/my-profile.yaml',
+        useProxy: false,
+        substore: false,
+        allowFixedInterval: false
+      })
+    ).resolves.toMatchObject({
+      name: 'my-profile',
+      home: 'https://example.test/home'
+    })
+  })
 })
 
 describe('profile deletion (R2-ISS-034 / R2-ISS-067)', () => {

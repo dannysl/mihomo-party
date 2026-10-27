@@ -30,7 +30,11 @@ import {
 import { compileSimpleConfig, type SimpleSharedConfig } from './compiler'
 import { patchSimpleDraft } from './patch'
 import { normalizeSimpleProviderOptions } from './providers'
-import { replaceSimpleSource, resolveSimpleDraft } from './subscriptions'
+import {
+  attachSimpleSourceToGroups,
+  replaceSimpleSource,
+  resolveSimpleDraft
+} from './subscriptions'
 import {
   addSimpleNodes,
   readSimpleNodes,
@@ -693,7 +697,10 @@ export async function configureSimpleSubscription(
       const oldResolved = old
         ? (await resolveSimpleDraft({ ...draft, sources: [old] })).sources[0]
         : undefined
-      return replaceSimpleSource(draft, oldResolved, nextSource)
+      const next = replaceSimpleSource(draft, oldResolved, nextSource)
+      return options?.targetGroups?.length
+        ? attachSimpleSourceToGroups(next, nextSource, options.targetGroups)
+        : next
     }
     const result = await commitSimpleState(state, {
       ...state,
@@ -701,6 +708,29 @@ export async function configureSimpleSubscription(
       inheritedProfileIds: [...new Set([...(state.inheritedProfileIds || []), profileId])],
       draft: await update(state.draft),
       published: await update(state.published)
+    })
+    if (result.errors.length) throw new Error(result.errors.join('\n'))
+  })
+}
+
+export async function attachSimpleSubscriptionGroups(
+  profileId: string,
+  targetGroups: string[]
+): Promise<void> {
+  await simpleWriteQueue.run(async () => {
+    const state = await getSimpleState()
+    const source =
+      state.draft.sources.find((item) => item.profileId === profileId) ||
+      state.published.sources.find((item) => item.profileId === profileId)
+    if (!source) throw new Error('找不到订阅来源')
+    const resolved = (await resolveSimpleDraft({ ...state.draft, sources: [source] })).sources[0]
+    const attach = (draft: SimpleDraft): SimpleDraft =>
+      attachSimpleSourceToGroups(draft, resolved, targetGroups)
+    const result = await commitSimpleState(state, {
+      ...state,
+      revision: state.revision + 1,
+      draft: attach(state.draft),
+      published: attach(state.published)
     })
     if (result.errors.length) throw new Error(result.errors.join('\n'))
   })
