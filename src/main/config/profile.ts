@@ -22,12 +22,16 @@ import {
   mihomoProfileWorkDir,
   mihomoWorkDir,
   profileConfigPath,
-  profilePath,
-  simpleConfigPath
+  profilePath
 } from '../utils/dirs'
 import { createLogger } from '../utils/logger'
 import { atomicWriteFile } from '../utils/safeFile'
-import type { SimpleSubscriptionOptions } from '../../shared/simple-config'
+import type { LocalSubscriptionOptions } from '../../shared/local-config'
+import {
+  isLocalProfile,
+  LEGACY_SIMPLE_PROFILE_ID,
+  LOCAL_PROFILE_ID
+} from '../../shared/local-config'
 import { getAppConfig } from './app'
 import { getControledMihomoConfig } from './controledMihomo'
 import { getPluginItem, pluginSchedule } from './plugin'
@@ -201,12 +205,48 @@ function normalizeCustomHome(value?: string): string | undefined {
   throw new Error(i18next.t('profiles.editInfo.invalidHome'))
 }
 
+export async function ensureLocalProfileItem(): Promise<IProfileItem> {
+  const config = await getProfileConfig(true)
+  const existing = config.items.find(
+    (candidate) => candidate.id === LOCAL_PROFILE_ID || candidate.id === LEGACY_SIMPLE_PROFILE_ID
+  )
+  if (existing?.id === LOCAL_PROFILE_ID && existing.type === 'local' && existing.name)
+    return existing
+  const translated: unknown = i18next.t('profiles.localProfile')
+  const item: IProfileItem = {
+    id: LOCAL_PROFILE_ID,
+    type: 'local',
+    name:
+      typeof translated === 'string' && translated && translated !== 'profiles.localProfile'
+        ? translated
+        : '本地配置',
+    updated: Date.now()
+  }
+  await updateProfileConfig((next) => {
+    next.items = next.items.filter(
+      (candidate) =>
+        candidate.id === existing?.id ||
+        (candidate.id !== LOCAL_PROFILE_ID && candidate.id !== LEGACY_SIMPLE_PROFILE_ID)
+    )
+    const index = next.items.findIndex((candidate) => candidate.id === existing?.id)
+    if (index === -1) next.items.push(item)
+    else next.items[index] = { ...next.items[index], ...item }
+    if (next.current === existing?.id) next.current = LOCAL_PROFILE_ID
+    return next
+  })
+  const { BrowserWindow } = await import('electron')
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.send('profileConfigUpdated')
+  }
+  return item
+}
+
 export async function updateProfileItem(
   item: IProfileItem,
-  simpleOptions?: SimpleSubscriptionOptions
+  sourceOptions?: LocalSubscriptionOptions
 ): Promise<void> {
   const customHome = normalizeCustomHome(item.customHome)
-  const previous = simpleOptions ? await getProfileItem(item.id) : undefined
+  const previous = await getProfileItem(item.id)
   await updateProfileConfig((config) => {
     const index = config.items.findIndex((i) => i.id === item.id)
     if (index === -1) {
@@ -215,17 +255,17 @@ export async function updateProfileItem(
     config.items[index] = { ...item, customHome }
     return config
   })
-  if (simpleOptions && (await getAppConfig()).operationMode === 'simple') {
+  if (sourceOptions) {
     try {
-      const { configureSimpleSubscription } = await import('../simple/service')
-      await configureSimpleSubscription(item.id, simpleOptions)
+      const { configureLocalSource } = await import('../local/service')
+      await configureLocalSource(item.id, sourceOptions)
     } catch (error) {
       if (previous) {
         await updateProfileItem(previous)
         try {
           await mihomoHotReloadConfig()
         } catch (restoreError) {
-          profileLogger.error('Failed to restore simple subscription settings', restoreError)
+          profileLogger.error('Failed to restore subscription source settings', restoreError)
         }
       }
       throw error
@@ -235,9 +275,16 @@ export async function updateProfileItem(
 
 export async function addProfileItem(
   item: Partial<IProfileItem>,
-  simpleOptions?: SimpleSubscriptionOptions
+  sourceOptions?: LocalSubscriptionOptions
 ): Promise<IProfileItem> {
+  const { getLocalState } = await import('../local/store')
+  const localState = await getLocalState()
+  const isLocalSource = (profileId: string): boolean =>
+    [...localState.draft.sources, ...localState.published.sources].some(
+      (source) => source.profileId === profileId
+    )
   const newItem = await createProfile(item)
+  const sourceProfile = sourceOptions !== undefined || isLocalSource(newItem.id)
   let shouldChangeCurrent = false
   let newProfileIsCurrentAfterUpdate = false
   await updateProfileConfig((config) => {
@@ -247,17 +294,17 @@ export async function addProfileItem(
     } else {
       config.items.push(newItem)
     }
-    if (!config.current) {
+    if (!config.current && !sourceProfile) {
       shouldChangeCurrent = true
       newProfileIsCurrentAfterUpdate = true
     }
     return config
   })
 
-  if ((await getAppConfig()).operationMode === 'simple') {
-    const { configureSimpleSubscription } = await import('../simple/service')
+  if (sourceProfile) {
+    const { configureLocalSource } = await import('../local/service')
     await addProfileUpdater(newItem)
-    await configureSimpleSubscription(newItem.id, simpleOptions)
+    await configureLocalSource(newItem.id, sourceOptions)
     return newItem
   }
 
@@ -283,7 +330,7 @@ export async function addProfileItem(
 
 export async function removeProfileItem(id: string): Promise<void> {
   const item = await getProfileItem(id)
-  if (item?.type === 'plugin' && item.pluginId) {
+  if (item?.pluginId) {
     // 级联删除插件：tombstone → plugin lock → revoke → profile → item → vault 在同一个临界区内完成。
     // profile 记录由插件侧在锁内删除，避免在途更新的 upsertPluginProfile 在取锁前把它重建出来。
     const { removePluginForProfile } = await import('../resolve/plugin')
@@ -296,10 +343,12 @@ export async function removeProfileItem(id: string): Promise<void> {
 }
 
 export function withProfileRemoval<T>(id: string, remove: () => Promise<T>): Promise<T> {
-  if (!id || !existsSync(simpleConfigPath())) return remove()
-  return import('../simple/service').then(({ withSimpleProfileRemoval }) =>
-    withSimpleProfileRemoval(id, remove)
-  )
+  return getProfileItem(id).then((item) => {
+    if (!id || !isLocalProfile(item)) return remove()
+    return import('../local/service').then(({ withLocalProfileRemoval }) =>
+      withLocalProfileRemoval(id, remove)
+    )
+  })
 }
 
 // 正在删除中的 profile：并发删除时不能把彼此选作新的 current
@@ -563,7 +612,6 @@ export async function createProfile(item: Partial<IProfileItem>): Promise<IProfi
     updateTimeout: item.updateTimeout
   }
 
-  // Local
   if (newItem.type === 'local') {
     await setProfileStr(id, item.file || '')
     return newItem
@@ -811,18 +859,21 @@ export async function validateProfileCandidate(
   const candidatePath = join(candidateDir, 'config.yaml')
 
   try {
-    const { core = 'mihomo', operationMode } = await getAppConfig()
+    const { core = 'mihomo' } = await getAppConfig()
     const baseProfile = await parseProfileContent(item.id, content, item.ageSecretKey)
-    if (operationMode === 'simple') {
-      const [{ compileSimpleConfig }, { resolveSimpleDraft }, { getSimpleState }] =
-        await Promise.all([
-          import('../simple/compiler'),
-          import('../simple/subscriptions'),
-          import('../simple/store')
-        ])
-      const state = await getSimpleState()
-      const draft = await resolveSimpleDraft(state.published, { item, config: baseProfile })
-      // Validate the subscription's nodes even before its first simple-mode import.
+    const { getLocalState } = await import('../local/store')
+    const localState = await getLocalState()
+    const isLocalSource = [...localState.draft.sources, ...localState.published.sources].some(
+      (source) => source.profileId === item.id
+    )
+    if (isLocalSource) {
+      const [{ compileLocalConfig }, { resolveLocalDraft }, { getLocalState }] = await Promise.all([
+        import('../local/compiler'),
+        import('../local/subscriptions'),
+        import('../local/store')
+      ])
+      const state = await getLocalState()
+      const draft = await resolveLocalDraft(state.published, { item, config: baseProfile })
       if (!draft.sources.some((source) => source.profileId === item.id && source.mode !== 'http')) {
         draft.sources.push({
           id: `candidate-${item.id}`,
@@ -833,7 +884,7 @@ export async function validateProfileCandidate(
           proxies: (baseProfile?.proxies || []) as Record<string, unknown>[]
         })
       }
-      const result = compileSimpleConfig(draft, await getControledMihomoConfig())
+      const result = compileLocalConfig(draft, await getControledMihomoConfig())
       if (result.errors.length) throw new Error(result.errors.join('\n'))
       await atomicWriteFile(candidatePath, result.yaml, { encoding: 'utf8' })
       await checkProfileConfig(candidatePath, core, undefined, opts)
@@ -865,9 +916,10 @@ export async function getProfileStr(id: string | undefined): Promise<string> {
 export async function setProfileStr(id: string, content: string): Promise<void> {
   // 读取最新的配置
   const { current } = await getProfileConfig(true)
-  if ((await getAppConfig()).operationMode === 'simple') {
-    const { getSimpleState } = await import('../simple/store')
-    const state = await getSimpleState()
+  const currentItem = await getProfileItem(current)
+  if (isLocalProfile(currentItem)) {
+    const { getLocalState } = await import('../local/store')
+    const state = await getLocalState()
     const linked = state.published.sources.some((source) => source.profileId === id)
     const item = await getProfileItem(id)
     if (linked && item) {
@@ -881,13 +933,17 @@ export async function setProfileStr(id: string, content: string): Promise<void> 
         try {
           await mihomoHotReloadConfig()
         } catch (restoreError) {
-          profileLogger.error('Failed to restore simple subscription config', restoreError)
+          profileLogger.error('Failed to restore subscription source config', restoreError)
         }
         throw error
       }
       return
     }
     await atomicWriteFile(profilePath(id), content, { encoding: 'utf8' })
+    if (id === current) {
+      const { importLocalProfileContent } = await import('../local/store')
+      await importLocalProfileContent(content)
+    }
     return
   }
   await atomicWriteFile(profilePath(id), content, { encoding: 'utf8' })
@@ -1088,7 +1144,7 @@ export async function upsertPluginProfile(
   // 调度字段（interval / autoUpdate）不在这里：它们在写入时从插件记录现读，见 commitPluginProfile
   const owned = {
     id: meta.profileId,
-    type: 'plugin' as const,
+    type: 'local' as const,
     name: meta.name,
     pluginId: meta.pluginId,
     updated: Date.now()
@@ -1194,7 +1250,7 @@ export async function syncPluginProfileSchedule(
   let saved: IProfileItem | undefined
   await updateProfileConfig((config) => {
     const idx = config.items.findIndex((i) => i.id === profileId)
-    if (idx === -1 || config.items[idx].type !== 'plugin') return config
+    if (idx === -1 || !config.items[idx].pluginId) return config
     config.items[idx] = {
       ...config.items[idx],
       ...(schedule.interval !== undefined ? { interval: schedule.interval } : {}),

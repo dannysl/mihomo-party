@@ -283,8 +283,6 @@ interface ISmartModelStatus {
 }
 
 interface IAppConfig {
-  operationMode?: 'standard' | 'simple'
-  modeSelected?: boolean
   core: 'mihomo' | 'mihomo-alpha' | 'mihomo-smart' | 'mihomo-specific'
   specificVersion?: string
   enableSmartCore: boolean
@@ -600,7 +598,7 @@ interface ISubscriptionUserInfo {
 
 interface IProfileItem {
   id: string
-  type: 'remote' | 'local' | 'plugin'
+  type: 'remote' | 'local'
   name: string
   url?: string // remote
   file?: string // local
